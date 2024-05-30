@@ -3,6 +3,7 @@
 
 #include "MyCharacter.h"
 #include "Camera/CameraComponent.h"
+#include "Components/StaticMeshComponent.h"
 
 // Sets default values
 AMyCharacter::AMyCharacter()
@@ -12,6 +13,9 @@ AMyCharacter::AMyCharacter()
 	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("PlayerCamera"));
 	Camera->SetupAttachment(RootComponent);
 	Camera->bUsePawnControlRotation = true;
+
+	SwordMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Sword Mesh"));
+	SwordMesh->SetupAttachment(GetMesh(),FName("SwordSocket"));
 }
 
 // Called when the game starts or when spawned
@@ -33,6 +37,8 @@ void AMyCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &ACharacter::Jump);
+	PlayerInputComponent->BindAction("Attack", IE_Pressed, this, &AMyCharacter::StartAttack);
+
 	PlayerInputComponent->BindAxis("MoveForward",this, &AMyCharacter::MoveForward);
 	PlayerInputComponent->BindAxis("MoveRight", this, &AMyCharacter::MoveRight);
 	PlayerInputComponent->BindAxis("TurnCamera", this, &AMyCharacter::TurnCamera);
@@ -57,4 +63,33 @@ void AMyCharacter::TurnCamera(float InputValue)
 void AMyCharacter::LookUp(float InputValue)
 {
 	AddControllerPitchInput(InputValue);
+}
+
+void AMyCharacter::StartAttack()
+{
+	if (AttackAnimation && !bIsAttacking)
+	{
+		GetMesh()->PlayAnimation(AttackAnimation, false);
+		bIsAttacking = true;
+	}
+}
+
+void AMyCharacter::LineTrace()
+{
+	//get socket location
+	FVector StartLocation = SwordMesh->GetSocketLocation(FName("Start"));
+	FVector EndLocation = SwordMesh->GetSocketLocation(FName("End"));
+	
+	//setup linetrace
+	FHitResult HitResult;
+	FCollisionQueryParams TraceParams;
+	TraceParams.AddIgnoredActor(this);
+
+	//linetrace
+	GetWorld()->LineTraceSingleByChannel(HitResult, StartLocation, EndLocation,ECC_Visibility, TraceParams);
+	if (HitResult.bBlockingHit)
+	{
+		AActor* ActorHit = HitResult.GetActor();
+		ActorHit->Destroy();
+	}
 }
